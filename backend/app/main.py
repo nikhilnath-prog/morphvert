@@ -17,6 +17,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from pathlib import Path
+
 from app.api.v1.endpoints import ai_pdf, conversions_public, download, files, pdf
 from app.core.config import settings
 from app.middleware.middleware import ErrorHandlingMiddleware, LoggingMiddleware, SecurityHeadersMiddleware
@@ -60,17 +66,28 @@ app.add_middleware(
 async def health_check() -> dict:
     return {"status": "healthy", "version": settings.PROJECT_VERSION}
 
+FRONTEND_DIR = Path("/app/frontend-dist")
 
-@app.get("/", tags=["root"])
-async def root() -> dict:
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    index_file = FRONTEND_DIR / "index.html"
+
+    if index_file.exists():
+        return FileResponse(index_file)
+
     return {
         "message": "Welcome to Morphvert API",
         "version": settings.PROJECT_VERSION,
         "docs": "/docs",
         "openapi": "/openapi.json",
     }
-
-
+app.include_router(files.router, prefix=settings.API_V1_STR)
+app.include_router(download.router, prefix=settings.API_V1_STR)
+app.include_router(pdf.router, prefix=settings.API_V1_STR)
+app.include_router(pdf.pdf_router, prefix=settings.API_V1_STR)
+app.include_router(ai_pdf.router)
+app.include_router(conversions_public.router, prefix=settings.API_V1_STR)
 app.include_router(files.router, prefix=settings.API_V1_STR)
 app.include_router(download.router, prefix=settings.API_V1_STR)
 app.include_router(pdf.router, prefix=settings.API_V1_STR)
@@ -89,7 +106,46 @@ async def general_exception_handler(request: Request, exc: Exception):
             "detail": str(exc) if settings.DEBUG else None,
         },
     )
+# ============================================================
+# React Frontend
+# ============================================================
 
+if FRONTEND_DIR.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_DIR / "assets"),
+        name="frontend-assets",
+    )
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def frontend_fallback(path: str):
+    # Never intercept API or FastAPI system routes
+    if (
+        path.startswith("api/")
+        or path.startswith("docs")
+        or path.startswith("openapi.json")
+        or path.startswith("health")
+    ):
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Not found"},
+        )
+
+    requested_file = FRONTEND_DIR / path
+
+    if requested_file.is_file():
+        return FileResponse(requested_file)
+
+    index_file = FRONTEND_DIR / "index.html"
+
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Frontend not found"},
+    )
 
 def custom_openapi():
     if app.openapi_schema:
