@@ -1,0 +1,6 @@
+{
+  "name": "Morphvert",
+  "description": "Transform Files Effortlessly - A modern conversion platform for PDFs, images, and documents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

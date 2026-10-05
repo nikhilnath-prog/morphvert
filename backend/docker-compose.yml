@@ -1,0 +1,114 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: morphvert-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-morphvert_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-morphvert_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-morphvert_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morphvert_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: morphvert-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: morphvert-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://morphvert_user:morphvert_pass@postgres:5432/morphvert_db
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CELERY_URL: redis://redis:6379/1
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+      - ./converted:/app/converted
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: morphvert-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://morphvert_user:morphvert_pass@postgres:5432/morphvert_db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+      - ./converted:/app/converted
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    command: celery -A app.workers.celery worker --loglevel=info
+
+  # Celery Flower Monitor
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: morphvert-flower
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
+    command: celery -A app.workers.celery flower --port=5555
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: morphvert_network

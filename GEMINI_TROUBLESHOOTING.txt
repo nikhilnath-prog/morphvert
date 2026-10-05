@@ -1,0 +1,25 @@
+MORPHVERT — GEMINI PDF SUMMARIZER TROUBLESHOOTING
+
+1. Put your real key in a PRIVATE file at:
+   Morphvert-Updated/backend/.env
+
+   Add:
+   GEMINI_API_KEY=your_real_gemini_api_key
+   GEMINI_MODEL=gemini-3.8-flash
+
+   Do not put this key in frontend/.env.local or commit/share backend/.env.
+
+2. Start the backend from the backend folder:
+   cd D:\Morpv(h)ert-Updated\backend
+   .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+
+   (Use the actual folder name on your computer.)
+
+3. Check http://127.0.0.1:8000/health
+
+4. The summarizer now tries Gemini 3.8 Flash first, then stable fallback models,
+   with a short retry for temporary 429/5xx failures. Retry Generate Summary.
+   Check the backend terminal for the model/status diagnostic if it still fails.
+
+5. If the key was ever exposed in a screenshot, revoke it and create a new one.
+   Do not send the .env file or API key in chat.

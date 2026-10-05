@@ -1,0 +1,11 @@
+MORPHVERT PATCH NOTES
+
+1. Keep your existing backend/.env private. Do not commit or share it.
+2. Ensure backend/.env contains a strong SECRET_KEY.
+3. For AI PDF summaries, set GEMINI_API_KEY=your_actual_key in backend/.env. The key is optional for other tools.
+4. Run the backend from the backend folder:
+   .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+5. Verify http://127.0.0.1:8000/health and http://127.0.0.1:8000/docs.
+6. The conversion history endpoint is enabled; it returns an empty list because this lightweight MVP does not persist conversion history.
+
+Security: this patch archive intentionally excludes backend/.env. Copy your local values into your own private .env file; do not put secrets in frontend/.env.local.
