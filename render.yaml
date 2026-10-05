@@ -1,0 +1,252 @@
+services:
+
+  # ==========================================================
+  # Morphvert Web Application
+  # React + FastAPI in one public service
+  # ==========================================================
+  - type: web
+    name: morphvert
+    runtime: docker
+    plan: free
+    region: singapore
+
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    healthCheckPath: /health
+
+    envVars:
+
+      # -------------------------
+      # PostgreSQL
+      # -------------------------
+      - key: DATABASE_URL
+        fromDatabase:
+          name: morphvert-db
+          property: connectionString
+
+      # -------------------------
+      # Redis / Key Value
+      # -------------------------
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: REDIS_CELERY_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      # -------------------------
+      # Security
+      # -------------------------
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: ALGORITHM
+        value: HS256
+
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+
+      - key: JWT_AUDIENCE
+        value: morphvert-api
+
+      # -------------------------
+      # Environment
+      # -------------------------
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "False"
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      # -------------------------
+      # API
+      # -------------------------
+      - key: API_V1_STR
+        value: /api/v1
+
+      - key: PROJECT_NAME
+        value: Morphvert API
+
+      - key: PROJECT_VERSION
+        value: "1.0.0"
+
+      - key: PROJECT_DESCRIPTION
+        value: Advanced File Conversion Platform
+
+      # -------------------------
+      # Admin
+      # -------------------------
+      - key: FIRST_SUPERUSER_EMAIL
+        sync: false
+
+      - key: FIRST_SUPERUSER_PASSWORD
+        sync: false
+
+      # -------------------------
+      # CORS
+      # -------------------------
+      - key: CORS_ORIGINS
+        value: '["https://morphvert.onrender.com"]'
+
+      - key: CORS_ALLOW_CREDENTIALS
+        value: "True"
+
+      - key: CORS_ALLOW_METHODS
+        value: '["*"]'
+
+      - key: CORS_ALLOW_HEADERS
+        value: '["*"]'
+
+      # -------------------------
+      # Storage
+      # -------------------------
+      - key: LOCAL_STORAGE_PATH
+        value: uploads
+
+      - key: CONVERTED_FILES_PATH
+        value: converted
+
+      - key: TEMP_FILES_PATH
+        value: temp
+
+      - key: LOGS_DIR
+        value: logs
+
+      - key: MAX_FILE_SIZE
+        value: "52428800"
+
+      - key: FILE_RETENTION_DAYS
+        value: "30"
+
+      # -------------------------
+      # Features
+      # -------------------------
+      - key: ENABLE_OCR
+        value: "True"
+
+      - key: ENABLE_AI_SUMMARY
+        value: "True"
+
+      - key: ENABLE_BATCH_PROCESSING
+        value: "True"
+
+      - key: MAX_BATCH_SIZE
+        value: "100"
+
+      # -------------------------
+      # Celery
+      # -------------------------
+      - key: CELERY_TASK_TIME_LIMIT
+        value: "3600"
+
+      - key: CELERY_TASK_SOFT_TIME_LIMIT
+        value: "3000"
+
+      # -------------------------
+      # Gemini
+      # -------------------------
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+
+
+  # ==========================================================
+  # Celery Background Worker
+  # ==========================================================
+  - type: worker
+    name: morphvert-worker
+    runtime: docker
+    plan: free
+    region: singapore
+
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    dockerCommand: celery -A app.workers.celery worker --loglevel=info
+
+    envVars:
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: morphvert-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: REDIS_CELERY_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: morphvert-redis
+          property: connectionString
+
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "False"
+
+
+  # ==========================================================
+  # Redis-compatible Key Value
+  # ==========================================================
+  - type: keyvalue
+    name: morphvert-redis
+    plan: free
+    region: singapore
+    ipAllowList: []
+
+
+databases:
+
+  # ==========================================================
+  # PostgreSQL
+  # ==========================================================
+  - name: morphvert-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
